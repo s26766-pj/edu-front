@@ -1,56 +1,63 @@
 <script lang="ts">
     import {
         deleteLatestScheduleByLocation,
-        deleteTimetableTask, fetchLatestScheduleByLocation,
+        deleteTimetableTask, 
         fetchLessonsByLocation,
         fetchRoomsByLocation,
         fetchTimeslotsByLocation,
         fetchTimetable,
         fetchTimetableStatus,
-        generateTimetable, saveSchedule, analyzeSchedule
+        generateTimetable, 
+        saveSchedule, 
+        analyzeSchedule, 
+        fetchUnassignedLessonsByLocation
     } from '../api';
-    import type {Schedule, SolverStatus, Timetable} from "../types";
+        import type {SolverStatus, Timetable} from "../types";
     import StatusModal from './StatusModal.svelte';
     import Lessons from "./Lessons.svelte";
+    import TimetableGrid from "./TimetableGrid.svelte";
+    import Schedule from "./Schedule.svelte";
     import {onMount} from "svelte";
-    import {TEMPORARY_LOCATION_ID} from "../types";
+    import {TEMPORARY_LOCATION_ID, TEMPORARY_SCHEDULE_NAME} from "../types";
+    import { schedule, loading, error, solving } from '../lib/stores/appStore';
+    import { appActions } from '../lib/stores/appStore';
+    import { DataService } from '../lib/services/dataService';
 
-    let scheduleName = "schedule name";
     let taskId: string = '';
     let timetable: Timetable | null = null;
-    let schedule: Schedule | null = null;
     let status: SolverStatus = 'IDLE';
     let pollingInterval: ReturnType<typeof setInterval> | null = null;
-    let error: string = '';
-    let loading = true;
     let analysisResult: any = null;
     let analyzing = false;
+    let scheduleName = "Generated Schedule";
+    
+    // Use store values
+    $: scheduleData = $schedule;
+    $: isLoading = $loading;
+    $: errorMessage = $error;
 
     onMount(async () => {
-        try {
-            schedule = await fetchLatestScheduleByLocation(TEMPORARY_LOCATION_ID);
-            console.log("murmur schedule received:", JSON.stringify(schedule, null, 2));
-        } catch (err) {
-            error = err instanceof Error ? err.message : 'Unknown error';
-        } finally {
-            loading = false;
-        }
+        // Initialize application data using the service
+        await DataService.initialize();
     });
     async function solveTimetable() {
         try {
-            error = '';
+            appActions.setError('');
             status = 'SOLVING_ACTIVE';
+            appActions.setSolving(true);
             timetable = null;
 
             const lessons = await fetchLessonsByLocation(TEMPORARY_LOCATION_ID);
             const rooms = await fetchRoomsByLocation(TEMPORARY_LOCATION_ID);
             const timeslots = await fetchTimeslotsByLocation(TEMPORARY_LOCATION_ID);
             taskId = await generateTimetable(lessons, rooms, timeslots)
+            appActions.setSolving(true, taskId);
             startPolling(taskId);
 
         } catch (err) {
             status = 'IDLE';
-            error = '❌ Unknown error.';
+            appActions.setSolving(false);
+            appActions.setError('❌ Unknown error.');
         }
     }
 
@@ -68,12 +75,12 @@
                 if (timetable) {
                     console.log("murmur: ", JSON.stringify(timetable))
                     await saveSchedule(timetable, scheduleName, TEMPORARY_LOCATION_ID)
-                    // location.reload();
+                    location.reload();
                 }
             } catch (err) {
                 clearInterval(pollingInterval!);
                 pollingInterval = null;
-                error = `Failed to check timetable status: ${(err as Error).message}`;
+                appActions.setError(`Failed to check timetable status: ${(err as Error).message}`);
                 status = 'IDLE';
             }
         }, 30000); // 30s
@@ -86,31 +93,32 @@
             status = '';
             clearInterval(pollingInterval!);
         } catch (err) {
-            error = (err as Error).message;
+            appActions.setError((err as Error).message);
         }
     }
 
     async function handleClear() {
         try {
             await deleteLatestScheduleByLocation(TEMPORARY_LOCATION_ID);
-            location.reload()
+            await DataService.clearScheduleAndRefresh();
+            location.reload();
         } catch (err) {
-            error = (err as Error).message;
+            appActions.setError((err as Error).message);
         }
     }
 
     async function handleAnalyze() {
-        if (!schedule) {
-            error = 'No schedule available to analyze.';
+        if (!scheduleData) {
+            appActions.setError('No schedule available to analyze.');
             return;
         }
 
         try {
             analyzing = true;
-            error = '';
-            analysisResult = await analyzeSchedule(schedule);
+            appActions.setError('');
+            analysisResult = await analyzeSchedule(scheduleData);
         } catch (err) {
-            error = err instanceof Error ? err.message : 'Unknown error during analysis';
+            appActions.setError(err instanceof Error ? err.message : 'Unknown error during analysis');
             analysisResult = null;
         } finally {
             analyzing = false;
@@ -121,12 +129,12 @@
 
 <button on:click={solveTimetable}>Solve</button>
 <button on:click={handleClear}>Clear</button>
-<button on:click={handleAnalyze} disabled={!schedule || analyzing}>
+<button on:click={handleAnalyze} disabled={!scheduleData || analyzing}>
     {analyzing ? 'Analyzing...' : 'Analyze'}
 </button>
 
-{#if error}
-    <p style="color: red;">❌ {error}</p>
+{#if errorMessage}
+    <p style="color: red;">❌ {errorMessage}</p>
 {/if}
 
 {#if analysisResult}
@@ -136,46 +144,45 @@
     </div>
 {/if}
 
-{#if taskId}
+{#if status === 'SOLVING_ACTIVE'}
     <StatusModal
-            {taskId}
-            {pollingInterval}
             {status}
             onCancel={handleCancel}
     />
 
 {/if}
-<p>🧾 Unassigned lessons:</p>
-<Lessons />
-{#if status === 'NOT_SOLVING' || 'IDLE'}
-    <h4>Timetable:</h4>
-    {#if schedule}
-        {#if schedule.lessons}
-            <ul style="list-style: none; padding: 0;">
-                {#each schedule.lessons as lesson}
-                    <li style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
-                        <strong>{lesson.subject}</strong> — 
-                        {#if lesson.teacher && lesson.teacher.firstName && lesson.teacher.lastName}
-                            {lesson.teacher.firstName} {lesson.teacher.lastName}
-                        {:else if lesson.teacher && (lesson.teacher.firstName || lesson.teacher.lastName)}
-                            {lesson.teacher.firstName || ''} {lesson.teacher.lastName || ''}
-                        {:else}
-                            <em>No teacher assigned</em>
-                        {/if} — 
-                        {#if lesson.studentGroup && lesson.studentGroup.name}
-                            {lesson.studentGroup.name}
-                        {:else}
-                            <em>No group assigned</em>
-                        {/if} 
-                        <br>
-                        📍 <strong>{lesson.room?.name || 'Unknown room'}</strong> | 
-                        📅 <strong>{lesson.timeslot?.dayOfWeek || 'Unknown day'}</strong> | 
-                        ⏰ {lesson.timeslot?.startTime || 'Unknown'} - {lesson.timeslot?.endTime || 'Unknown'}
-                    </li>
-                {/each}
-            </ul>
-        {/if}
-    {:else}
-        <p>Nothing to show.</p>
-    {/if}
-{/if}
+<div class="lessons-section">
+    <Lessons />
+</div>
+<div class="schedule-section">
+    <TimetableGrid schedule={scheduleData} />
+</div>
+<div class="debug-section">
+    <Schedule schedule={scheduleData} status={status} />
+</div>
+
+<style>
+    .lessons-section {
+        margin-bottom: 2rem;
+        clear: both;
+        border: 3px solid red;
+        padding: 1rem;
+        background-color: rgba(255, 0, 0, 0.1);
+    }
+    
+    .schedule-section {
+        clear: both;
+        margin-top: 1rem;
+        border: 3px solid green;
+        padding: 1rem;
+        background-color: rgba(0, 255, 0, 0.1);
+    }
+
+    .debug-section {
+        clear: both;
+        margin-top: 1rem;
+        border: 3px solid blue;
+        padding: 1rem;
+        background-color: rgba(0, 0, 255, 0.1);
+    }
+</style>

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import {fetchTimeslotsByLocation, type Timeslot} from "../api";
-    import {TEMPORARY_LOCATION_ID} from "../types";
+    import {fetchTimeslotsByLocation} from "../api";
+    import {TEMPORARY_LOCATION_ID, type Timeslot} from "../types";
 
     let timeslots: Timeslot[] = [];
     let loading = true;

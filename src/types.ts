@@ -1,5 +1,6 @@
 // TODO pass location from token
 export const TEMPORARY_LOCATION_ID = 1;
+export const TEMPORARY_SCHEDULE_NAME = "schedule name";
 
 export const BASE_URL = 'http://localhost:8080';
 
@@ -24,6 +25,12 @@ export interface Teacher {
     location: number;
     firstName: string;
     lastName: string;
+}
+
+export interface StudentGroup {
+    id: number;
+    location: number;
+    name: string;
 }
 
 export interface Room {

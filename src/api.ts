@@ -1,4 +1,4 @@
-import type {Lesson, Room, Schedule, SolverStatus, Timeslot, Timetable} from "./types";
+import type {Lesson, Room, Schedule, SolverStatus, StudentGroup, Teacher, Timeslot, Timetable} from "./types";
 import {BASE_URL} from "./types";
 
 export async function fetchLessonsByLocation(locationId: number): Promise<Lesson[]> {
@@ -53,12 +53,28 @@ export async function fetchTimeslotsByLocation(locationId: number): Promise<Time
     return await res.json();
 }
 
+export async function fetchStudentGroupsByLocation(locationId: number): Promise<StudentGroup[]> {
+    const res = await fetch(`${BASE_URL}/student-groups/by-location?locationId=${encodeURIComponent(locationId)}`);
+    if (!res.ok) {
+        throw new Error('Failed to fetch student groups by location.');
+    }
+    return await res.json();
+}
+
+export async function fetchTeachersByLocation(locationId: number): Promise<Teacher[]> {
+    const res = await fetch(`${BASE_URL}/teachers/by-location?locationId=${encodeURIComponent(locationId)}`);
+    if (!res.ok) {
+        throw new Error('Failed to fetch teachers by location.');
+    }
+    return await res.json();
+}
+
 export async function generateTimetable(lessons: Lesson[], rooms: Room[], timeslots: Timeslot[]): Promise<string> {
 
-    const preparePayload = (lessons, rooms, timeslots) => ({
-        timeslotIds: timeslots.map(t => t.id),
-        roomIds: rooms.map(r => r.id),
-        lessonIds: lessons.map(l => l.id)
+    const preparePayload = (lessons: Lesson[], rooms: Room[], timeslots: Timeslot[]) => ({
+        timeslotIds: timeslots.map((t: Timeslot) => t.id),
+        roomIds: rooms.map((r: Room) => r.id),
+        lessonIds: lessons.map((l: Lesson) => l.id)
     });
 
     const payload = preparePayload(lessons, rooms, timeslots);
@@ -106,16 +122,27 @@ export async function deleteTimetableTask(taskId: string): Promise<void> {
     }
 }
 
-export async function saveSchedule(timetable, name, locationId) {
+export async function saveSchedule(timetable: any, name: string, locationId: number) {
     console.log("murmur timetable: ", JSON.stringify(timetable))
 
     try {
-        const transformedLessons = timetable.lessons.map(lesson => ({
-            lessonId: lesson.id,
-            roomId: lesson.room,
-            timeslotId: lesson.timeslot,
-            fixed: lesson.fixed
-        }));
+        // Debug: Check the structure of the first lesson
+        if (timetable.lessons.length > 0) {
+            console.log("First lesson structure:", JSON.stringify(timetable.lessons[0], null, 2));
+            console.log("Room:", timetable.lessons[0].room);
+            console.log("Timeslot:", timetable.lessons[0].timeslot);
+        }
+
+        const transformedLessons = timetable.lessons.map((lesson: any) => {
+            const transformed = {
+                lessonId: lesson.id,
+                roomId: lesson.room?.id || lesson.room, // Extract ID if room is an object
+                timeslotId: lesson.timeslot?.id || lesson.timeslot, // Extract ID if timeslot is an object
+                fixed: lesson.fixed || false
+            };
+            console.log("Transformed lesson:", transformed);
+            return transformed;
+        });
 
         const body = {
             name,
@@ -123,6 +150,9 @@ export async function saveSchedule(timetable, name, locationId) {
             score: timetable.score,
             lessons: transformedLessons
         };
+        
+        console.log("Final body to send:", JSON.stringify(body, null, 2));
+        
         const response = await fetch(`${BASE_URL}/schedules`, {
             method: 'POST',
             headers: {
@@ -186,9 +216,9 @@ export async function analyzeSchedule(schedule: Schedule): Promise<any> {
         // Convert Schedule to TimetableDto format that the backend expects
         // This avoids Jackson object identity issues
         const timetableDto = {
-            timeslotIds: [],
-            roomIds: [],
-            lessonIds: [],
+            timeslotIds: [] as number[],
+            roomIds: [] as number[],
+            lessonIds: [] as number[],
             lessons: schedule.lessons?.map(lesson => ({
                 id: lesson.id,
                 subject: lesson.subject,
@@ -213,8 +243,8 @@ export async function analyzeSchedule(schedule: Schedule): Promise<any> {
                 } : null,
                 fixed: lesson.fixed || false
             })) || [],
-            timeslots: [],
-            rooms: [],
+            timeslots: [] as Timeslot[],
+            rooms: [] as Room[],
             solverStatus: null,
             score: schedule.score || "0hard/0soft"
         };

@@ -1,0 +1,139 @@
+---
+alwaysApply: true
+---
+## EduPlanner Frontend — Project Overview for AI Assistants
+
+This document gives an at‑a‑glance understanding of the codebase to help future AI chats reason about structure, responsibilities, and extension points.
+
+### Purpose
+- **Goal**: Frontend UI for generating, viewing, saving, clearing, and analyzing timetables (schedules) for a location.
+- **Backend**: Communicates with a REST API at `http://localhost:8080`.
+
+### Tech Stack
+- **Framework**: Svelte 5 with SvelteKit 2
+- **Build**: Vite 7
+- **Lang**: TypeScript
+- **UI libs**: Flowbite Svelte (present in deps; not currently used in code)
+
+### How to Run
+- Install deps: `npm install`
+- Dev server: `npm run dev`
+- Type checks: `npm run check`
+- Lint/format: `npm run lint`, `npm run format`
+- Build: `npm run build`, preview: `npm run preview`
+
+### Directory Structure
+```text
+eduplanner-front/
+  src/
+    routes/
+      +page.svelte          # Root page; manual tabbed menu for sub-views
+      Header.svelte         # Header banner with live date
+      Timetable.svelte      # Orchestrates solver, schedule fetch, save, analyze, modal
+      Lessons.svelte        # Lists unassigned lessons for location
+      Rooms.svelte          # Lists rooms for location
+      Timeslots.svelte      # Lists timeslots for location
+      StatusModal.svelte    # Modal shown while solving
+    api.ts                  # API client functions to backend
+    types.ts                # Shared types + BASE_URL and TEMPORARY_LOCATION_ID
+    app.html                # SvelteKit app template
+    app.d.ts                # SvelteKit type augmentation stub
+    lib/                    # `$lib` alias root (empty placeholder)
+  svelte.config.js          # SvelteKit config (adapter-auto)
+  vite.config.ts            # Vite config
+  eslint.config.js          # ESLint configuration
+  README.md                 # Default SvelteKit README
+  package.json              # Scripts and dependencies
+```
+
+### Configuration and Constants
+- `src/types.ts`
+  - `export const BASE_URL = 'http://localhost:8080'` — backend origin.
+  - `export const TEMPORARY_LOCATION_ID = 1` — hardcoded active location.
+  - Suggestion: move these to environment variables for different deployments.
+
+### Types (selected)
+- `Timeslot { id, location, dayOfWeek, startTime, endTime }`
+- `Room { id, location, name }`
+- `Teacher { id, location, firstName, lastName, ... }`
+- `StudentGroup { id, location, name }`
+- `Lesson { id, location, subject, teacher, studentGroup, room, timeslot, fixed }`
+- `Timetable { name, timeslots, rooms, lessons, score, solverStatus }`
+- `Schedule { id, name?, location?, created?, score?, lessons }`
+
+### API Layer (`src/api.ts`)
+- Depends on `BASE_URL` and shared types. Uses `fetch` directly.
+- Functions:
+  - `fetchLessonsByLocation(locationId)` → `GET /lessons/by-location?locationId=`
+  - `fetchUnassignedLessonsByLocation(locationId)` → `GET /lessons/unassigned?locationId=`
+    - Handles `204 No Content` by returning `[]` and guards JSON parse.
+  - `fetchRoomsByLocation(locationId)` → `GET /rooms/by-location?locationId=`
+  - `fetchTimeslotsByLocation(locationId)` → `GET /timeslots/by-location?locationId=`
+  - `generateTimetable(lessons, rooms, timeslots)` → `POST /solver` returns `taskId` (as plain text)
+  - `fetchTimetableStatus(taskId)` → `GET /solver/{taskId}/status`
+  - `fetchTimetable(taskId)` → `GET /solver/{taskId}` returns `Timetable`
+  - `deleteTimetableTask(taskId)` → `DELETE /solver/{taskId}`
+  - `saveSchedule(timetable, name, locationId)` → `POST /schedules`
+    - Transforms lessons to `{ lessonId, roomId, timeslotId, fixed }` payload.
+  - `fetchLatestScheduleByLocation(locationId)` → `GET /schedules/by-location?locationId=`
+  - `deleteLatestScheduleByLocation(locationId)` → `DELETE /schedules/by-location?locationId=`
+  - `analyzeSchedule(schedule)` → `PUT /solver/analyze-dto`
+    - Converts `Schedule` to a DTO with deduped ids for backend analysis.
+
+### UI Composition and Flow
+- `routes/+page.svelte`
+  - Renders `Header` and a simple inline menu switching between `Timetable`, `Timeslots`, `Rooms` via a local `menu` variable.
+
+- `routes/Header.svelte`
+  - Shows a live date header using Svelte 5 reactivity (`SvelteDate`, `$effect`).
+
+- `routes/Lessons.svelte`
+  - On mount, loads unassigned lessons for `TEMPORARY_LOCATION_ID` and lists them. Basic loading/error states.
+
+- `routes/Timeslots.svelte` and `routes/Rooms.svelte`
+  - On mount, fetch and list timeslots/rooms.
+
+- `routes/StatusModal.svelte`
+  - Simple overlay shown while solver status is `SOLVING_ACTIVE`; exposes `onCancel` handler.
+
+- `routes/Timetable.svelte` (core orchestrator)
+  - State: `scheduleName`, `taskId`, `timetable`, `schedule`, `status`, `pollingInterval`, `error`, `analysisResult`, `analyzing`.
+  - On mount: fetches latest saved `Schedule` for `TEMPORARY_LOCATION_ID`.
+  - `solveTimetable()`:
+    - Fetches lessons/rooms/timeslots; posts to `/solver`; starts polling for status using `startPolling(taskId)`.
+  - `startPolling(taskId)`:
+    - Polls `/solver/{taskId}/status` every 30s. When status is `NOT_SOLVING`, stops polling, fetches `Timetable`, then calls `saveSchedule(...)` to persist.
+  - `handleCancel()`:
+    - Cancels solver via `DELETE /solver/{taskId}` and clears local polling.
+  - `handleClear()`:
+    - Deletes latest schedule for location and reloads the page.
+  - `handleAnalyze()`:
+    - Converts current `schedule` and calls `analyzeSchedule(...)`; shows JSON result.
+  - Renders: control buttons, errors, analysis results, modal, unassigned lessons, and the current `schedule.lessons` list.
+
+### Data Flow Summary
+1) User clicks Solve → frontend fetches source data → posts to `/solver` → polls status.
+2) When solving completes → fetch timetable → persist via `/schedules` → display saved schedule.
+3) User can Clear (delete latest schedule) or Analyze (convert schedule to DTO and call backend analyzer).
+
+### Notable Observations / Potential Improvements
+- `TEMPORARY_LOCATION_ID` and `BASE_URL` are hardcoded. Move to environment variables.
+- `flowbite-svelte` packages are installed but not used.
+- UI uses a manual tab switcher in `+page.svelte`; consider SvelteKit routing with separate pages.
+- In `Timetable.svelte`, the condition `{#if status === 'NOT_SOLVING' || 'IDLE'}` is always truthy due to the string literal. It likely intends `{#if status === 'NOT_SOLVING' || status === 'IDLE'}`.
+- Add robust error toasts and loading indicators across views; consider centralizing API error handling.
+- Consider extracting API URL builders and response schemas for stronger typing.
+
+### Extension Points
+- Add authentication and derive location from user context (see TODO in `types.ts`).
+- Introduce global state/store if cross-component state grows (e.g., selected location).
+- Replace `alert()` calls with non-blocking UI notifications.
+- Add tests (unit for utilities, component tests for key flows).
+
+### Quick References
+- Active location id: `TEMPORARY_LOCATION_ID = 1`
+- Backend base URL: `BASE_URL = 'http://localhost:8080'`
+- Core orchestrator: `routes/Timetable.svelte`
+- API functions: `src/api.ts`
+
+

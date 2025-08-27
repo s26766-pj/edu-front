@@ -2,7 +2,7 @@
     import { SvelteDate } from 'svelte/reactivity';
 
     const date = new SvelteDate();
-    const dateFormat = {
+    const dateFormat: Intl.DateTimeFormatOptions = {
         weekday: "long",
         year: "numeric",
         month: "long",

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import {fetchRoomsByLocation, type Room} from "../api";
-    import {TEMPORARY_LOCATION_ID} from "../types";
+    import {fetchRoomsByLocation, } from "../api";
+    import {TEMPORARY_LOCATION_ID, type Room} from "../types";
 
     let rooms: Room[] = [];
     let loading = true;

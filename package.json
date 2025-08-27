@@ -33,6 +33,7 @@
 	},
 	"dependencies": {
 		"flowbite-svelte": "^1.10.20",
-		"flowbite-svelte-icons": "^2.2.1"
+		"flowbite-svelte-icons": "^2.2.1",
+		"muuri": "^0.9.5"
 	}
 }
