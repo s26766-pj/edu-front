@@ -12,12 +12,14 @@ export interface Timeslot {
     dayOfWeek: string; // "MONDAY"
     startTime: string; // "08:00"
     endTime: string;   // "09:30"
+    partTime?: boolean; // true for weekend/part-time slots
 }
 
 export interface StudentGroup {
     id: number;
     location: number;
     name: string;
+    partTime?: boolean; // true for part-time groups
 }
 
 export interface Teacher {

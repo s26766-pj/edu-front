@@ -8,7 +8,9 @@
         viewMode, 
         selectedStudentGroupId, 
         selectedTeacherId,
-        filteredLessons
+        filteredLessons,
+        rooms,
+        selectedRoomId
     } from '../lib/stores/appStore';
     import { appActions } from '../lib/stores/appStore';
     import { loadMuuri } from '../lib/muuri.client';
@@ -24,10 +26,12 @@
     $: currentViewMode = $viewMode;
     $: currentSelectedStudentGroupId = $selectedStudentGroupId;
     $: currentSelectedTeacherId = $selectedTeacherId;
+    $: roomsData = $rooms;
+    $: currentSelectedRoomId = $selectedRoomId;
     $: assignedLessons = schedule?.lessons || [];
     
     // Create a reactive key that changes when filters change
-    $: filterKey = `${currentViewMode}-${currentSelectedStudentGroupId}-${currentSelectedTeacherId}`;
+    $: filterKey = `${currentViewMode}-${currentSelectedStudentGroupId}-${currentSelectedTeacherId}-${currentSelectedRoomId}`;
 
     // Data is now loaded via the DataService in the parent component
 
@@ -94,7 +98,7 @@
                 const matches = lesson.studentGroup?.id === currentSelectedStudentGroupId;
                 console.log(`Lesson ${lesson.id} studentGroup ${lesson.studentGroup?.id} matches selected ${currentSelectedStudentGroupId}: ${matches}`);
                 return matches;
-            } else {
+            } else if (currentViewMode === 'teacher') {
                 // If no teachers loaded or no selection, show all lessons
                 if (teachersData.length === 0 || !currentSelectedTeacherId) {
                     console.log(`No teacher filter applied for lesson ${lesson.id}`);
@@ -102,6 +106,15 @@
                 }
                 const matches = lesson.teacher?.id === currentSelectedTeacherId;
                 console.log(`Lesson ${lesson.id} teacher ${lesson.teacher?.id} matches selected ${currentSelectedTeacherId}: ${matches}`);
+                return matches;
+            } else {
+                // Room filter
+                if (roomsData.length === 0 || !currentSelectedRoomId) {
+                    console.log(`No room filter applied for lesson ${lesson.id}`);
+                    return true;
+                }
+                const matches = lesson.room?.id === currentSelectedRoomId;
+                console.log(`Lesson ${lesson.id} room ${lesson.room?.id} matches selected ${currentSelectedRoomId}: ${matches}`);
                 return matches;
             }
         });
@@ -115,7 +128,7 @@
         return lesson || null;
     }
 
-    function handleViewModeChange(mode: 'student' | 'teacher') {
+    function handleViewModeChange(mode: 'student' | 'teacher' | 'room') {
         console.log(`[VIEW_MODE] Changing to ${mode}, current: ${currentViewMode}`);
         appActions.setViewMode(mode);
         
@@ -132,8 +145,14 @@
                 console.log(`[VIEW_MODE] Setting default teacher: ${teachersData[0].id}`);
                 appActions.setSelectedTeacher(teachersData[0].id);
             }
+        } else if (mode === 'room' && roomsData.length > 0) {
+            // Select first room if none selected
+            if (!currentSelectedRoomId) {
+                console.log(`[VIEW_MODE] Setting default room: ${roomsData[0].id}`);
+                appActions.setSelectedRoom(roomsData[0].id);
+            }
         }
-        console.log(`[VIEW_MODE] Mode changed. New filterKey will be: ${mode}-${currentSelectedStudentGroupId}-${currentSelectedTeacherId}`);
+        console.log(`[VIEW_MODE] Mode changed. New filterKey will be: ${mode}-${currentSelectedStudentGroupId}-${currentSelectedTeacherId}-${currentSelectedRoomId}`);
     }
 
     // Initialize Muuri grid for each cell
@@ -232,6 +251,15 @@
                 >
                     Teacher
                 </button>
+                <button 
+                    class="view-btn {currentViewMode === 'room' ? 'active' : ''}"
+                    on:click={() => {
+                        console.log('Room button clicked');
+                        handleViewModeChange('room');
+                    }}
+                >
+                    Room
+                </button>
             </div>
             
             <div class="filter-dropdown">
@@ -248,7 +276,7 @@
                             <option value={group.id}>{group.name}</option>
                         {/each}
                     </select>
-                {:else}
+                {:else if currentViewMode === 'teacher'}
                     <select 
                         bind:value={$selectedTeacherId}
                         on:change={(e) => {
@@ -259,6 +287,19 @@
                     >
                         {#each teachersData as teacher}
                             <option value={teacher.id}>{teacher.firstName} {teacher.lastName}</option>
+                        {/each}
+                    </select>
+                {:else}
+                    <select 
+                        bind:value={$selectedRoomId}
+                        on:change={(e) => {
+                            const target = e.target as HTMLSelectElement;
+                            appActions.setSelectedRoom(parseInt(target.value));
+                            console.log('Room changed to:', target.value);
+                        }}
+                    >
+                        {#each roomsData as room}
+                            <option value={room.id}>{room.name}</option>
                         {/each}
                     </select>
                 {/if}
@@ -295,12 +336,18 @@
                                             <div class="lesson-content">
                                                 <strong>{lesson.subject}</strong><br/>
                                                 <small>{lesson.teacher?.firstName} {lesson.teacher?.lastName}</small><br/>
-                                                <small>{lesson.studentGroup?.name}</small>
+                                                <small>{lesson.studentGroup?.name}</small><br/>
+                                                <small>{lesson.room?.name}</small><br/>
+                                                <small>
+                                                    {lesson.timeslot?.dayOfWeek}
+                                                    {lesson.timeslot?.startTime ? ` ${lesson.timeslot.startTime.substring(0,5)}` : ''}
+                                                    {lesson.timeslot?.endTime ? `-${lesson.timeslot.endTime.substring(0,5)}` : ''}
+                                                </small>
+                                            </div>
                                         </div>
-                                    </div>
-                                {/if}
-                            </div>
-                        </td>
+                                    {/if}
+                                </div>
+                            </td>
                 {/each}
             </tr>
         {/each}

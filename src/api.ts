@@ -69,7 +69,7 @@ export async function fetchTeachersByLocation(locationId: number): Promise<Teach
     return await res.json();
 }
 
-export async function generateTimetable(lessons: Lesson[], rooms: Room[], timeslots: Timeslot[]): Promise<string> {
+export async function generateTimetable(lessons: Lesson[], rooms: Room[], timeslots: Timeslot[], minutesSpentLimit?: number): Promise<string> {
 
     const preparePayload = (lessons: Lesson[], rooms: Room[], timeslots: Timeslot[]) => ({
         timeslotIds: timeslots.map((t: Timeslot) => t.id),
@@ -78,7 +78,14 @@ export async function generateTimetable(lessons: Lesson[], rooms: Room[], timesl
     });
 
     const payload = preparePayload(lessons, rooms, timeslots);
-    const res = await fetch(`${BASE_URL}/solver`, {
+    
+    // Build URL with optional minutesSpentLimit parameter
+    let url = `${BASE_URL}/solver`;
+    if (minutesSpentLimit !== undefined) {
+        url += `?minutesSpentLimit=${minutesSpentLimit}`;
+    }
+    
+    const res = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

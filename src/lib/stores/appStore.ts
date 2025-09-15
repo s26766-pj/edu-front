@@ -12,9 +12,10 @@ interface AppState {
     timeslots: Timeslot[];
     studentGroups: StudentGroup[];
     teachers: Teacher[];
-    viewMode: 'student' | 'teacher';
+    viewMode: 'student' | 'teacher' | 'room';
     selectedStudentGroupId: number | null;
     selectedTeacherId: number | null;
+    selectedRoomId: number | null;
     solving: boolean;
     solverStatus: SolverStatus;
     taskId: string;
@@ -32,6 +33,7 @@ const initialState: AppState = {
     viewMode: 'student',
     selectedStudentGroupId: null,
     selectedTeacherId: null,
+    selectedRoomId: null,
     solving: false,
     solverStatus: 'IDLE',
     taskId: ''
@@ -51,20 +53,23 @@ export const teachers = derived(appState, $state => $state.teachers);
 export const viewMode = derived(appState, $state => $state.viewMode);
 export const selectedStudentGroupId = derived(appState, $state => $state.selectedStudentGroupId);
 export const selectedTeacherId = derived(appState, $state => $state.selectedTeacherId);
+export const selectedRoomId = derived(appState, $state => $state.selectedRoomId);
 export const solving = derived(appState, $state => $state.solving);
 export const solverStatus = derived(appState, $state => $state.solverStatus);
 
 // Filtered lessons based on current view mode and selection
 export const filteredLessons = derived(
-    [schedule, viewMode, selectedStudentGroupId, selectedTeacherId],
-    ([$schedule, $viewMode, $selectedStudentGroupId, $selectedTeacherId]) => {
+    [schedule, viewMode, selectedStudentGroupId, selectedTeacherId, selectedRoomId],
+    ([$schedule, $viewMode, $selectedStudentGroupId, $selectedTeacherId, $selectedRoomId]) => {
         if (!$schedule?.lessons) return [];
         
         return $schedule.lessons.filter(lesson => {
             if ($viewMode === 'student') {
                 return !$selectedStudentGroupId || lesson.studentGroup?.id === $selectedStudentGroupId;
-            } else {
+            } else if ($viewMode === 'teacher') {
                 return !$selectedTeacherId || lesson.teacher?.id === $selectedTeacherId;
+            } else {
+                return !$selectedRoomId || lesson.room?.id === $selectedRoomId;
             }
         });
     }
@@ -113,7 +118,7 @@ export const appActions = {
     },
     
     // Set view mode
-    setViewMode: (viewMode: 'student' | 'teacher') => {
+    setViewMode: (viewMode: 'student' | 'teacher' | 'room') => {
         appState.update(state => ({ ...state, viewMode }));
     },
     
@@ -125,6 +130,10 @@ export const appActions = {
     // Set selected teacher
     setSelectedTeacher: (id: number | null) => {
         appState.update(state => ({ ...state, selectedTeacherId: id }));
+    },
+    // Set selected room
+    setSelectedRoom: (id: number | null) => {
+        appState.update(state => ({ ...state, selectedRoomId: id }));
     },
     
     // Update schedule
