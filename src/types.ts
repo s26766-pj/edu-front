@@ -1,7 +1,3 @@
-// TODO pass location from token
-export const TEMPORARY_LOCATION_ID = 1;
-export const TEMPORARY_SCHEDULE_NAME = "schedule name";
-
 export const BASE_URL = 'http://localhost:8080';
 
 export type SolverStatus = 'NOT_SOLVING' | 'SOLVING_ACTIVE' | string;
@@ -88,5 +84,24 @@ export interface Schedule {
     lastModifiedBy?: string;
     score?: string;
     lessons: Lesson[];
+}
+
+export interface LoginResponse {
+    id: number;
+    login: string;
+    firstName?: string;
+    lastName?: string;
+    token: string;
+}
+
+export interface RegisterRequest {
+    login: string;
+    password: string;
+}
+
+export interface RegisterResponse {
+    id: number;
+    login: string;
+    role: string; // expected to be USER by default on backend
 }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Schedule } from '../types';
+    import type { Schedule } from '../../types';
 
     export let schedule: Schedule | null = null;
     export let status: string = '';

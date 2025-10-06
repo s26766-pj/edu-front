@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { fetchTeachersByLocation } from '../api';
-    import { TEMPORARY_LOCATION_ID } from '../types';
-    import type { Teacher } from '../types';
+    import type { Teacher } from '../../types';
+	import { fetchMyTeachers } from '../../api/ToTeacherController';
 
     let teachers: Teacher[] = [];
     let loading = true;
@@ -10,7 +9,7 @@
 
     onMount(async () => {
         try {
-            teachers = await fetchTeachersByLocation(TEMPORARY_LOCATION_ID);
+            teachers = await fetchMyTeachers();
             loading = false;
         } catch (err) {
             error = err instanceof Error ? err.message : 'Failed to fetch teachers';

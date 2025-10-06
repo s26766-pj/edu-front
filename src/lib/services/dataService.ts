@@ -1,14 +1,11 @@
-import { 
-    fetchRoomsByLocation, 
-    fetchTimeslotsByLocation, 
-    fetchUnassignedLessonsByLocation,
-    fetchStudentGroupsByLocation,
-    fetchTeachersByLocation,
-    fetchLatestScheduleByLocation
-} from '../../api';
-import { TEMPORARY_LOCATION_ID } from '../../types';
+import { fetchMyUnassignedLessons } from '../../api/ToLessonController';
+import { fetchMyRooms } from '../../api/ToRoomController';
+import { fetchMyLatestSchedule } from '../../api/ToScheduleController';
+import { fetchMyStudentGroups } from '../../api/ToStudentGroupController';
+import { fetchMyTeachers } from '../../api/ToTeacherController';
+import { fetchMyTimeslots } from '../../api/ToTimeslotController';
 import { appActions } from '../stores/appStore';
-import type { Schedule } from '../../types';
+
 
 export class DataService {
     /**
@@ -30,12 +27,12 @@ export class DataService {
                 teachers,
                 latestSchedule
             ] = await Promise.all([
-                fetchRoomsByLocation(TEMPORARY_LOCATION_ID),
-                fetchTimeslotsByLocation(TEMPORARY_LOCATION_ID),
-                fetchUnassignedLessonsByLocation(TEMPORARY_LOCATION_ID),
-                fetchStudentGroupsByLocation(TEMPORARY_LOCATION_ID),
-                fetchTeachersByLocation(TEMPORARY_LOCATION_ID),
-                fetchLatestScheduleByLocation(TEMPORARY_LOCATION_ID).catch(() => null) // Don't fail if no schedule exists
+                fetchMyRooms(),
+                fetchMyTimeslots(),
+                fetchMyUnassignedLessons(),
+                fetchMyStudentGroups(),
+                fetchMyTeachers(),
+                fetchMyLatestSchedule().catch(() => null) // Don't fail if no schedule exists
             ]);
 
             console.log('DataService: Loaded data:', {
@@ -71,7 +68,7 @@ export class DataService {
     static async refreshSchedule(): Promise<void> {
         try {
             console.log('DataService: Refreshing schedule...');
-            const latestSchedule = await fetchLatestScheduleByLocation(TEMPORARY_LOCATION_ID).catch(() => null);
+            const latestSchedule = await fetchMyLatestSchedule().catch(() => null);
             appActions.setSchedule(latestSchedule);
             console.log('DataService: Schedule refreshed');
         } catch (error) {
@@ -86,7 +83,7 @@ export class DataService {
     static async refreshUnassignedLessons(): Promise<void> {
         try {
             console.log('DataService: Refreshing unassigned lessons...');
-            const unassignedLessons = await fetchUnassignedLessonsByLocation(TEMPORARY_LOCATION_ID);
+            const unassignedLessons = await fetchMyUnassignedLessons();
             appActions.setUnassignedLessons(unassignedLessons);
             console.log('DataService: Unassigned lessons refreshed:', unassignedLessons.length);
         } catch (error) {

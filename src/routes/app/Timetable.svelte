@@ -1,28 +1,24 @@
 <script lang="ts">
     import {
-        deleteLatestScheduleByLocation,
         deleteTimetableTask, 
-        fetchLessonsByLocation,
-        fetchRoomsByLocation,
-        fetchTimeslotsByLocation,
         fetchTimetable,
         fetchTimetableStatus,
         generateTimetable, 
-        saveSchedule, 
-        analyzeSchedule, 
-        fetchUnassignedLessonsByLocation
-    } from '../api';
-        import type {SolverStatus, Timetable, Lesson, Timeslot} from "../types";
+        analyzeSchedule
+    } from '../../api/ToTimetableController';
+        import type {SolverStatus, Timetable, Lesson, Timeslot} from "../../types";
     import StatusModal from './StatusModal.svelte';
     import Lessons from "./Lessons.svelte";
     import TimetableGrid from "./TimetableGrid.svelte";
     import Schedule from "./Schedule.svelte";
     import {onMount} from "svelte";
-    import {TEMPORARY_LOCATION_ID, TEMPORARY_SCHEDULE_NAME} from "../types";
-    import { schedule, loading, error, solving } from '../lib/stores/appStore';
-    import { appActions } from '../lib/stores/appStore';
-    import { DataService } from '../lib/services/dataService';
-
+    import { schedule, loading, error, solving } from '../../lib/stores/appStore';
+    import { appActions } from '../../lib/stores/appStore';
+    import { DataService } from '../../lib/services/dataService';
+    import { fetchMyRooms } from '../../api/ToRoomController';
+    import { fetchMyTimeslots } from '../../api/ToTimeslotController';
+    import { fetchMyLessons } from '../../api/ToLessonController';
+    import { deleteMyLatestSchedule, saveMySchedule } from '../../api/ToScheduleController';
     let taskId: string = '';
     let timetable: Timetable | null = null;
     let status: SolverStatus = 'IDLE';
@@ -46,8 +42,14 @@
     $: errorMessage = $error;
 
     onMount(async () => {
-        // Initialize application data using the service
-        await DataService.initialize();
+        try {
+            console.log('[Timetable] initialize start');
+            await DataService.initialize();
+            console.log('[Timetable] initialize done');
+        } catch (e) {
+            console.error('[Timetable] initialize error:', e);
+            appActions.setError(e instanceof Error ? e.message : 'Unknown init error');
+        }
     });
 
     function splitByStudyType(lessons: Lesson[], timeslots: Timeslot[]) {
@@ -69,7 +71,7 @@
                     pollingInterval = null;
                     const solved = await fetchTimetable(jobId);
                     timetable = solved;
-                    await saveSchedule(solved, scheduleName, TEMPORARY_LOCATION_ID);
+                    await saveMySchedule(solved, scheduleName);
                     location.reload();
                 }
             } catch (err) {
@@ -88,9 +90,9 @@
             appActions.setSolving(true);
             timetable = null;
 
-            const lessons = await fetchLessonsByLocation(TEMPORARY_LOCATION_ID);
-            const rooms = await fetchRoomsByLocation(TEMPORARY_LOCATION_ID);
-            const timeslots = await fetchTimeslotsByLocation(TEMPORARY_LOCATION_ID);
+            const lessons = await fetchMyLessons();
+            const rooms = await fetchMyRooms();
+            const timeslots = await fetchMyTimeslots();
 
             const { ftLessons, ptLessons, ftTimes, ptTimes } = splitByStudyType(lessons, timeslots);
 
@@ -118,6 +120,7 @@
             }
 
         } catch (err) {
+            console.error('[Timetable] solveTimetable error:', err);
             status = 'IDLE';
             appActions.setSolving(false);
             appActions.setError('❌ Unknown error.');
@@ -164,7 +167,7 @@
                     };
 
                     timetable = merged;
-                    await saveSchedule(merged, scheduleName, TEMPORARY_LOCATION_ID);
+                    await saveMySchedule(merged, scheduleName);
                     location.reload();
                 }
             } catch (err) {
@@ -197,7 +200,7 @@
 
     async function handleClear() {
         try {
-            await deleteLatestScheduleByLocation(TEMPORARY_LOCATION_ID);
+            await deleteMyLatestSchedule();
             await DataService.clearScheduleAndRefresh();
             location.reload();
         } catch (err) {

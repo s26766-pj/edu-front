@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { fetchStudentGroupsByLocation } from '../api';
-    import { TEMPORARY_LOCATION_ID } from '../types';
-    import type { StudentGroup } from '../types';
+    import type { StudentGroup } from '../../types';
+	import { fetchMyStudentGroups } from '../../api/ToStudentGroupController';
 
     let studentGroups: StudentGroup[] = [];
     let loading = true;
@@ -10,7 +9,7 @@
 
     onMount(async () => {
         try {
-            studentGroups = await fetchStudentGroupsByLocation(TEMPORARY_LOCATION_ID);
+            studentGroups = await fetchMyStudentGroups();
             loading = false;
         } catch (err) {
             error = err instanceof Error ? err.message : 'Failed to fetch student groups';

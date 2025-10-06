@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import type { Lesson } from '../types';
-    import { loadMuuri } from '../lib/muuri.client';
-    import { unassignedLessons } from '../lib/stores/appStore';
+    import type { Lesson } from '../../types';
+    import { loadMuuri } from '../../lib/muuri.client';
+    import { unassignedLessons } from '../../lib/stores/appStore';
 
     // Use store values instead of local state
     $: lessons = $unassignedLessons;

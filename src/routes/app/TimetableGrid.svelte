@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import type { Lesson, Timeslot, StudentGroup, Teacher } from '../types';
+    import type { Lesson } from '../../types';
     import { 
         timeslots, 
         studentGroups, 
@@ -11,9 +11,9 @@
         filteredLessons,
         rooms,
         selectedRoomId
-    } from '../lib/stores/appStore';
-    import { appActions } from '../lib/stores/appStore';
-    import { loadMuuri } from '../lib/muuri.client';
+    } from '../../lib/stores/appStore';
+    import { appActions } from '../../lib/stores/appStore';
+    import { loadMuuri } from '../../lib/muuri.client';
 
     export let schedule: any = null;
     let uniqueDays: string[] = [];
